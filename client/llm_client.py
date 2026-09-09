@@ -1,9 +1,10 @@
+import asyncio
 import os
 from typing import Any, AsyncGenerator
 
 from dotenv import load_dotenv
 from client.response import StreamEvent, TextDelta, TokenUsage, EventType
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIError, AsyncOpenAI, RateLimitError
 
 
 load_dotenv()
@@ -15,6 +16,8 @@ class LLMClient:
     def __init__(self) -> None:
         """初始化客户端实例，默认底层 AsyncOpenAI 连接句柄为 None(延迟加载模式)。"""
         self._client: AsyncOpenAI | None = None
+        """最大重试数"""
+        self._max_retries: int = 3
 
     def get_client(self) -> None:
         """获取或初始化单例 AsyncOpenAI 客户端句柄。
@@ -54,15 +57,44 @@ class LLMClient:
             "messages": messages,
             "stream": stream
         }
-        # 根据 stream 参数路由到不同的响应处理生成器
-        if stream:
-            async for event in self._stream_response(client, kwargs):
-                yield event
-        else:
-            event = await self._non_stream_response(client, kwargs)
-            yield event
+        for attempt in range(self._max_retries + 1):
+            try:
 
-        return
+                # 根据 stream 参数路由到不同的响应处理生成器
+                if stream:
+                    async for event in self._stream_response(client, kwargs):
+                        yield event
+                else:
+                    event = await self._non_stream_response(client, kwargs)
+                    yield event
+
+                return
+            except RateLimitError as e:
+                if attempt < self._max_retries:
+                    wait_time = 2**attempt
+                    await asyncio.sleep(wait_time)
+                else:
+                    yield StreamEvent(
+                        type=EventType.ERROR,
+                        error=f"超过最大限制: {e}"
+                    )
+                    return
+            except APIConnectionError as e:
+                if attempt < self._max_retries:
+                    wait_time = 2**attempt
+                    await asyncio.sleep(wait_time)
+                else:
+                    yield StreamEvent(
+                        type=EventType.ERROR,
+                        error=f"链接错误: {e}"
+                    )
+                    return
+            except APIError as e:
+                yield StreamEvent(
+                    type=EventType.ERROR,
+                    error=f"API错误: {e}"
+                )
+                return
 
     async def _stream_response(self, client: AsyncOpenAI, kwargs: dict[str, Any]) -> AsyncGenerator[StreamEvent, None]:
         """处理流式响应，分块解析 API 增量数据并转换为内部 StreamEvent 类型。"""
