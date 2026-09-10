@@ -3,7 +3,7 @@ import os
 from typing import Any, AsyncGenerator
 
 from dotenv import load_dotenv
-from client.response import StreamEvent, TextDelta, TokenUsage, EventType
+from client.response import StreamEvent, TextDelta, TokenUsage, StreamEventType
 from openai import APIConnectionError, APIError, AsyncOpenAI, RateLimitError
 
 
@@ -75,7 +75,7 @@ class LLMClient:
                     await asyncio.sleep(wait_time)
                 else:
                     yield StreamEvent(
-                        type=EventType.ERROR,
+                        type=StreamEventType.ERROR,
                         error=f"超过最大限制: {e}"
                     )
                     return
@@ -85,13 +85,13 @@ class LLMClient:
                     await asyncio.sleep(wait_time)
                 else:
                     yield StreamEvent(
-                        type=EventType.ERROR,
+                        type=StreamEventType.ERROR,
                         error=f"链接错误: {e}"
                     )
                     return
             except APIError as e:
                 yield StreamEvent(
-                    type=EventType.ERROR,
+                    type=StreamEventType.ERROR,
                     error=f"API错误: {e}"
                 )
                 return
@@ -127,12 +127,12 @@ class LLMClient:
             # 若当前 Chunk 包含增量文本内容，立刻产出文本增量事件
             if delta.content:
                 yield StreamEvent(
-                    type=EventType.TEXT_DELTA,
+                    type=StreamEventType.TEXT_DELTA,
                     text_delta=TextDelta(delta.content)
                 )
         # 流结束，产出统一的 MESSAGE_COMPLETE 终结事件，附带 Token 统计与结束原因
         yield StreamEvent(
-            type=EventType.MESSAGE_COMPLETE,
+            type=StreamEventType.MESSAGE_COMPLETE,
             finish_reason=finish_reason,
             usage=usage
         )
@@ -159,7 +159,7 @@ class LLMClient:
             )
         # 返回一次性的完整消息事件
         return StreamEvent(
-            type=EventType.MESSAGE_COMPLETE,
+            type=StreamEventType.MESSAGE_COMPLETE,
             text_delta=text_delta,
             finish_reason=choice.finish_reason,
             usage=usage
