@@ -14,49 +14,46 @@ class Agent:
     """
 
     def __init__(self):
-        """初始化 Agent, 实例化底层的异步 LLM 客户端"""
+        """初始化 Agent 实例，延迟加载 LLM 客户端与上下文管理器。"""
         self.client = LLMClient()
         self.context_manager = ContextManager()
 
     async def run(self, message: str):
-        """运行 Agent 主逻辑入口
+        """运行 Agent 主逻辑入口，对外暴露标准的事件流接口。
 
-        Args:
-            message (str): 用户输入的提示词或指令
+         Args:
+             message (str): 用户输入的提示词、指令或提问内容。
 
-        Yields:
-            AgentEvent: 智能体事件流（如启动事件、文本输出事件、错误事件等）
-        """
-        # 1. 触发智能体启动事件
+         Yields:
+             AgentEvent: 智能体生命周期事件流（如 AGENT_START、TEXT_DELTA、TEXT_COMPLETE、AGENT_END 等）。
+         """
+        # 1. 产出智能体启动事件，通知上层UI/终端任务开始
         yield AgentEvent.agent_start(message)
 
-        # 上下文
+        # 2. 将当前用户输入追加至上下文历史管理系统中
         self.context_manager.add_user_message(message)
 
         final_response: str | None = None
-        # 2. 委托给内部 Agentic Loop 处理后续流式响应
+        # 3. 委托给内部的 _agentic_loop 处理具体的 LLM 交互与事件转换
         async for event in self._agentic_loop():
             yield event
-
+            # 捕获单轮完整回复事件，提取最终文本内容
             if event.type == AgentEventType.TEXT_COMPLETE:
                 final_response = event.data.get("content")
-
+        # 4. 产出智能体终结事件，带上最终回复结果
         yield AgentEvent.agent_end(final_response)
 
     async def _agentic_loop(self) -> AsyncGenerator[AgentEvent, None]:
-        """智能体内部驱动循环 (Think-Act-Observe Loop)
+        """智能体内部驱动循环 (Think-Act-Observe Loop)。
 
-        处理与 LLMClient 的流式通信，将底层 HTTP 响应事件转换为上层业务定义的 AgentEvent。
+        监听 LLMClient 的底层 API 流式响应，负责：
+        - 文本增量 (TEXT_DELTA) 的实时事件转换与拼接。
+        - 异常错误 (ERROR) 的捕获与事件包装。
+        - 轮次结束后助手回复 (Assistant Message) 的上下文回写。
 
         Yields:
-            AgentEvent: 转换后的 Agent 业务事件
+            AgentEvent: 转换后的上层业务事件。
         """
-        # TODO: 后续可将上下文历史与系统提示词 (system_prompt) 注入此处
-        # messages = [{
-        #     "role": "user",
-        #     "content": "你好"
-        # }]
-
         response_text = ""
 
         # 开启流式响应，监听底层的 StreamEvent
@@ -72,16 +69,24 @@ class Agent:
             # 触发异常/错误响应
             elif event.type == StreamEventType.ERROR:
                 yield AgentEvent.agent_error(event.error or "Unknown error occurred.")
-
+        # 轮次结束：将 LLM 生成的完整回复保存进上下文历史，维持多轮对话记忆
         self.context_manager.add_assistant_message(response_text or None)
 
         if response_text:
             yield AgentEvent.text_complete(response_text)
 
     async def __aenter__(self) -> Agent:
+        """异步上下文管理器入口。
+
+        支持使用 `async with Agent() as agent:` 方式安全调用。
+        """
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """异步上下文管理器出口。
+
+        在退出 `async with` 作用域时自动触发，确保底层的 HTTP 会话与连接句柄被安全释放。
+        """
         if self.client:
             await self.client.close()
             self.client = None
