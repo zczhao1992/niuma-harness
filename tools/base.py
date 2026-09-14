@@ -37,12 +37,15 @@ class ToolResult:
     """附加元数据（如耗时、代码行数、文件路径等额外结构化信息）"""
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    truncated: bool = False
+
     @classmethod
-    def error_result(cls, error: str, output: str = ""):
+    def error_result(cls, error: str, output: str = "", **kwargs: Any):
         return cls(
             success=False,
             output=output,
-            error=error
+            error=error,
+            **kwargs
         )
 
     @classmethod
