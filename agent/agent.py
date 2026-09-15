@@ -5,6 +5,7 @@ from agent.events import AgentEvent, AgentEventType
 from client.llm_client import LLMClient
 from client.response import StreamEventType
 from context.manager import ContextManager
+from tools.registry import create_default_registry
 
 
 class Agent:
@@ -17,6 +18,7 @@ class Agent:
         """初始化 Agent 实例，延迟加载 LLM 客户端与上下文管理器。"""
         self.client = LLMClient()
         self.context_manager = ContextManager()
+        self.tool_registry = create_default_registry()
 
     async def run(self, message: str):
         """运行 Agent 主逻辑入口，对外暴露标准的事件流接口。
@@ -56,9 +58,14 @@ class Agent:
         """
         response_text = ""
 
+        tool_schemas = self.tool_registry.get_schemas()
+
         # 开启流式响应，监听底层的 StreamEvent
-        async for event in self.client.chat_completion(self.context_manager.get_messages(), True):
-            # print(event)
+        async for event in self.client.chat_completion(
+                self.context_manager.get_messages(),
+                tools=tool_schemas if tool_schemas else None,
+        ):
+            print(event)
 
             # 接收到模型增量输出文本
             if event.type == StreamEventType.TEXT_DELTA:

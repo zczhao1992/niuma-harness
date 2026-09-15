@@ -37,7 +37,8 @@ class ContextManager:
     def add_assistant_message(self, content: str) -> None:
         item = MessageItem(
             role='assistant',
-            content=content or ""
+            content=content or "",
+            token_count=count_tokens(content or "", self._modle_name)
         )
 
         self._messages.append(item)

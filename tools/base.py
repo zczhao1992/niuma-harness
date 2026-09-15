@@ -1,5 +1,6 @@
-import abc
 from __future__ import annotations
+import abc
+
 from pathlib import Path
 from pydantic import BaseModel, ValidationError
 from enum import Enum
