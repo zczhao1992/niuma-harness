@@ -41,20 +41,25 @@ class LLMClient:
             self._client = None
 
     def _build_tools(self, tools: list[dict[str, Any]]):
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool["name"],
-                    "description": tool.get("description", ""),
-                    "parameters": tool.get("parameters", {
-                        "type": "object",
-                        "properties": {}
-                    })
-                }
-            }
-            for tool in tools
-        ]
+        formatted_tools = []
+        for tool in tools:
+            # 如果 tool 已经是符合 OpenAI 规范的完整结构（有 type 和 function 键），直接传入
+            if "type" in tool and "function" in tool:
+                formatted_tools.append(tool)
+            else:
+                # 兼容旧格式包装
+                formatted_tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": tool["name"],
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("parameters", {
+                            "type": "object",
+                            "properties": {}
+                        })
+                    }
+                })
+        return formatted_tools
 
     async def chat_completion(
             self,
@@ -168,38 +173,38 @@ class LLMClient:
                             "name": '',
                             "arguments": ''
                         }
-                        if tool_call_delta.function:
-                            if tool_call_delta.function.name:
-                                tool_calls[idx]["name"] = tool_call_delta.function.name
+                    if tool_call_delta.function:
+                        if tool_call_delta.function.name:
+                            tool_calls[idx]["name"] = tool_call_delta.function.name
 
-                                yield StreamEvent(
-                                    type=StreamEventType.TOOL_CALL_START,
-                                    tool_call_delta=ToolCallDelta(
-                                        call_id=tool_calls[idx]["id"],
-                                        name=tool_call_delta.function.name
-                                    )
+                            yield StreamEvent(
+                                type=StreamEventType.TOOL_CALL_START,
+                                tool_call_delta=ToolCallDelta(
+                                    call_id=tool_calls[idx]["id"],
+                                    name=tool_calls[idx]["name"]
                                 )
-                            if tool_call_delta.function.arguments:
-                                tool_calls[idx]['arguments'] += tool_call_delta.function.arguments
+                            )
+                        if tool_call_delta.function.arguments:
+                            tool_calls[idx]['arguments'] += tool_call_delta.function.arguments
 
-                                yield StreamEvent(
-                                    type=StreamEventType.TOOL_CALL_DELTA,
-                                    tool_call_delta=ToolCallDelta(
-                                        call_id=tool_calls[idx]["id"],
-                                        name=tool_call_delta.function.name,
-                                        arguments_delta=tool_call_delta.function.arguments
-                                    )
+                            yield StreamEvent(
+                                type=StreamEventType.TOOL_CALL_DELTA,
+                                tool_call_delta=ToolCallDelta(
+                                    call_id=tool_calls[idx]["id"],
+                                    name=tool_calls[idx]["name"],
+                                    arguments_delta=tool_call_delta.function.arguments
                                 )
+                            )
 
-            for idx, tc in tool_calls.items():
-                yield StreamEvent(
-                    type=StreamEventType.TOOL_CALL_COMPLETE,
-                    tool_call=ToolCall(
-                        call_id=tc["id"],
-                        name=tc["name"],
-                        arguments=parse_tool_call_arguments(tc["arguments"])
-                    )
+        for idx, tc in tool_calls.items():
+            yield StreamEvent(
+                type=StreamEventType.TOOL_CALL_COMPLETE,
+                tool_call=ToolCall(
+                    call_id=tc["id"],
+                    name=tc["name"],
+                    arguments=parse_tool_call_arguments(tc["arguments"])
                 )
+            )
 
         # 流结束，产出统一的 MESSAGE_COMPLETE 终结事件，附带 Token 统计与结束原因
         yield StreamEvent(
@@ -224,8 +229,8 @@ class LLMClient:
             for tc in message.tool_calls:
                 tool_calls.append(
                     call_id=tc.id,
-                    name=tc.funtion.name,
-                    arguments=parse_tool_call_arguments(tc.funtion.arguments)
+                    name=tc.function.name,
+                    arguments=parse_tool_call_arguments(tc.function.arguments)
                 )
 
         # 提取非流式响应的 Token 使用量统计

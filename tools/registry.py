@@ -85,7 +85,7 @@ class ToolRegistry:
         """
         return [tool.to_openai_schema() for tool in self.get_tools()]
 
-    async def invoke(self, name: str, params: dict[str, Any], cwd: Path | None):
+    async def invoke(self, name: str, params: dict[str, Any], cwd: Path) -> ToolResult:
         """统一调度并异步执行指定的工具。
 
         包含工具存在性检查、输入参数 Schema 预校验、上下文构造以及异常结果包装。
@@ -120,10 +120,14 @@ class ToolRegistry:
         )
         try:
             # 4. 执行工具逻辑
-            await tool.execute(invocation)
+            result = await tool.execute(invocation)
+
         except Exception as e:
             logger.exception(f"工具 {name} 抛出异常")
-            return ToolResult.error_result(f"错误: {str(e)}", metadata={"tool_name", name})
+            result = ToolResult.error_result(
+                f"错误: {str(e)}", metadata={"tool_name", name})
+
+        return result
 
 
 def create_default_registry() -> ToolRegistry:

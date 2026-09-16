@@ -58,6 +58,12 @@ class ToolResult:
             **kwargs
         )
 
+    def to_model_output(self) -> str:
+        if self.success:
+            return self.output
+
+        return f"错误: {self.error}\n\nOutput:\n{self.output}"
+
 
 @dataclass
 class ToolInvocation:
@@ -130,7 +136,7 @@ class Tool(abc.ABC):
         # 判断 schema 是否为继承自 Pydantic BaseModel 的具体数据模型类
         if isinstance(schema, type) and issubclass(schema, BaseModel):
             try:
-                BaseModel(**params)
+                schema(**params)
             except ValidationError as e:
                 errors = []
                 for error in e.errors():
@@ -183,12 +189,15 @@ class Tool(abc.ABC):
         if isinstance(schema, type) and issubclass(schema, BaseModel):
             json_schema = model_json_schema(schema, mode="serialization")
             return {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": json_schema.get("properties", {}),
-                    "required": json_schema.get("required", []),
+                "type": "function",
+                "function": {
+                    "name": self.name,
+                    "description": self.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": json_schema.get("properties", {}),
+                        "required": json_schema.get("required", []),
+                    }
                 }
             }
 

@@ -95,7 +95,7 @@ class ReadFileTool(Tool):
                 formatted_lines.append(f"{i:6}|{line}")
 
             output = "\n".join(formatted_lines)
-            token_count = count_tokens(output)
+            token_count = count_tokens(output, "deepseek-chat")
 
             # 8. Token 溢出保护截断
             truncated = False
