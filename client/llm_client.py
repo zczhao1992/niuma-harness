@@ -85,7 +85,7 @@ class LLMClient:
 
         if tools:
             kwargs["tools"] = self._build_tools(tools)
-            # kwargs["tools_choice"] = "auto"
+            kwargs["tool_choice"] = "auto"
 
         for attempt in range(self._max_retries + 1):
             try:
