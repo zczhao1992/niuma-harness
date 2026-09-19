@@ -7,8 +7,11 @@ from rich.rule import Rule
 from rich.text import Text
 from rich.panel import Panel
 from rich.table import Table
+from rich.syntax import Syntax
 from utils.paths import display_path_rel_to_cwd, resolve_path
 from rich import box
+from rich.console import Group
+from utils.text import truncate_text
 
 
 AGENT_THEME = Theme(
@@ -189,6 +192,19 @@ class TUI:
             ".sql": "sql",
         }.get(suffix, "text")
 
+    def print_welcome(self, title: str, lines: list[str]) -> None:
+        body = "\n".join(lines)
+        self.console.print(
+            Panel(
+                Text(body, style="code"),
+                title=Text(title, style="highlight"),
+                title_align="left",
+                border_style="border",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+
     def tool_call_comlete(
         self, call_id: str,
         name: str,
@@ -212,29 +228,57 @@ class TUI:
         )
 
         primary_path = None
+        blocks = []
         if isinstance(metadata, dict) and isinstance(metadata.get("path"), str):
             primary_path = metadata.get("path")
 
         if name == "read_file" and success:
-            start_line, code = self._extract_read_file_code(output)
+            if primary_path:
+                start_line, code = self._extract_read_file_code(output)
 
-            shown_start = metadata.get("shown_start")
-            shown_end = metadata.get("shown_end")
-            total_lines = metadata.get("total_lines")
-            pl = self._guess_language(primary_path)
+                shown_start = metadata.get("shown_start")
+                shown_end = metadata.get("shown_end")
+                total_lines = metadata.get("total_lines")
+                pl = self._guess_language(primary_path)
 
-        display_args = dict(arguments)
-        for key in ("path", "cwd"):
-            val = display_args.get(key)
-            if isinstance(val, str) and self.cwd:
-                display_args[key] = str(display_path_rel_to_cwd(val, self.cwd))
+                # blocks.append(Text())
+
+                header_parts = [display_path_rel_to_cwd(
+                    primary_path, self.cwd)]
+                header_parts.append(" ● ")
+
+                if shown_start and shown_end and total_lines:
+                    header_parts.append(
+                        f"行数 {shown_start}-{shown_end} 总 {total_lines}")
+
+                header = "".join(header_parts)
+                blocks.append(Text(header, style="muted"))
+                blocks.append(Syntax(
+                    code,
+                    pl,
+                    theme="monokai",
+                    line_numbers=True,
+                    start_line=start_line,
+                    word_wrap=False
+                ))
+            else:
+                output_display = truncate_text(output, "", 240)
+                blocks.append(Syntax(
+                    output_display,
+                    "text",
+                    theme="monokai",
+                    word_wrap=False
+                ))
+
+        if truncated:
+            blocks.append(
+                Text("注：工具输出被截断", style="warning"))
 
         panel = Panel(
-            self._render_args_table(
-                name, display_args) if display_args else Text("(无)", style="muted"),
+            Group(*blocks),
             title=title,
             title_align="left",
-            subtitle=Text("运行中", style="muted"),
+            subtitle=Text("完成" if success else "失败", style=status_style),
             subtitle_align="right",
             border_style=border_style,
             box=box.ROUNDED,

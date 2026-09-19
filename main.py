@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 from typing import Any
 from agent.agent import Agent
@@ -19,6 +20,42 @@ class CLI:
         async with Agent() as agent:
             self.agent = agent
             return await self._process_message(message)
+
+    async def run_interactive(self) -> str | None:
+        self.tui.print_welcome(
+            "NiuMa-Harness",
+            lines=[
+                f"模型名称: deepseek/chat",
+                f"工作目录: {Path.cwd()}",
+                "指令: /help /config /approval /model /exit"
+            ]
+        )
+        async with Agent() as agent:
+            self.agent = agent
+
+            while True:
+                try:
+                    user_input = console.input("\n[user]>[/user]").strip()
+                    if not user_input:
+                        continue
+
+                    await self._process_message(user_input)
+                except KeyboardInterrupt:
+                    console.print("\n[dim]使用 /exit 命令退出[/dim]")
+                except EOFError:
+                    break
+
+        console.print("\n[dim]再见！[/dim]")
+
+    def _get_tool_kind(self, tool_name: str) -> str | None:
+        tool_kind = None
+        tool = self.agent.tool_registry.get(tool_name)
+        if not tool:
+            tool_kind = None
+
+        tool_kind = tool.kind.value
+
+        return tool_kind
 
     async def _process_message(self, message: str) -> str | None:
         if not self.agent:
@@ -45,12 +82,7 @@ class CLI:
                 console.print(f"\n[error] Error: {error}[/error]")
             elif event.type == AgentEventType.TOOL_CALL_START:
                 tool_name = event.data.get("name", "未知")
-                tool_kind = None
-                tool = self.agent.tool_registry.get(tool_name)
-                if not tool:
-                    tool_kind = None
-
-                tool_kind = tool.kind.value
+                tool_kind = self._get_tool_kind(tool_name)
                 self.tui.tool_call_start(
                     event.data.get("call_id", ""),
                     tool_name,
@@ -59,6 +91,17 @@ class CLI:
                 )
             elif event.type == AgentEventType.TOOL_CALL_COMPLETE:
                 tool_name = event.data.get("name", "未知")
+                tool_kind = self._get_tool_kind(tool_name)
+                self.tui.tool_call_comlete(
+                    event.data.get("call_id", ""),
+                    tool_name,
+                    tool_kind,
+                    event.data.get("success", False),
+                    event.data.get("output", ""),
+                    event.data.get("error"),
+                    event.data.get("metadata"),
+                    event.data.get("truncated", False)
+                )
 
         return final_response
 
@@ -78,8 +121,10 @@ def main(prompt: str | None):
         result = asyncio.run(cli.run_single(prompt))
         if result is None:
             sys.exit(1)
+    else:
+        asyncio.run(cli.run_interactive())
 
-    print("dddddddddddddd")
+    # print("dddddddddddddd")
 
 
 main()

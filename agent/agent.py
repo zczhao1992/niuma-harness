@@ -82,7 +82,19 @@ class Agent:
             elif event.type == StreamEventType.ERROR:
                 yield AgentEvent.agent_error(event.error or "Unknown error occurred.")
         # 轮次结束：将 LLM 生成的完整回复保存进上下文历史，维持多轮对话记忆
-        self.context_manager.add_assistant_message(response_text or None)
+        self.context_manager.add_assistant_message(
+            response_text or None,
+            [
+                {
+                    "id": tc.call_id,
+                    "type": "function",
+                    "function": {"name": tc.name, "arguments": str(tc.arguments)}
+                }
+                for tc in tool_calls
+            ]
+            if tool_calls
+            else None
+        )
 
         if response_text:
             yield AgentEvent.text_complete(response_text)
