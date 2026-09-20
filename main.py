@@ -6,6 +6,7 @@ from agent.events import AgentEventType
 from client.llm_client import LLMClient
 import asyncio
 import click
+from config.loader import load_config
 from ui.tui import TUI, get_console
 
 console = get_console()
@@ -114,7 +115,25 @@ async def run(messages: dict[str, Any]):
 
 @click.command()
 @click.argument("prompt", required=False)
-def main(prompt: str | None):
+@click.option(
+    "--cwd", "-c",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="当前工作目录"
+)
+def main(prompt: str | None, cwd: Path | None):
+
+    try:
+        config = load_config(cwd=cwd)
+    except Exception as e:
+        console.print(f"[error]配置错误: {e}[/error]")
+
+    errors = config.validate()
+    if errors:
+        for error in errors:
+            console.print(f"[error]{error}[/error]")
+
+        sys.exit(1)
+
     cli = CLI()
 
     if prompt:

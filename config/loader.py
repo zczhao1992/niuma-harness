@@ -1,1 +1,102 @@
-print("dd")
+from pathlib import Path
+
+import tomli
+from typing import Any
+from config.config import Config
+from platformdirs import user_config_dir
+from utils.errors import ConfigError
+import logging
+
+logger = logging.getLogger(__name__)
+
+CONFIG_FILE_NAME = "config.toml"
+AGENT_MD_FILE = "AGENT.MD"
+
+
+def get_config_dir() -> Path:
+    return Path(user_config_dir("niuma-harness"))
+
+
+def get_system_config_path() -> Path:
+    return get_config_dir() / CONFIG_FILE_NAME
+
+
+def _parse_toml(path: Path):
+    try:
+        with open(path, "rb") as f:
+            return tomli.load(f)
+    except tomli.TOMLDecodeError as e:
+        raise ConfigError("无效的 TOML {path}: {e}", config_file=str(path)) from e
+    except (OSError, IOError) as e:
+        raise ConfigError("读文件错误 {path}: {e}", config_file=str(path)) from e
+
+
+def _get_project_config(cwd: Path) -> Path | None:
+    current = cwd.resolve()
+    agent_dir = current / ".niuma-harness"
+
+    if agent_dir.is_dir():
+        config_file = agent_dir / CONFIG_FILE_NAME
+        if config_file.is_file():
+            return config_file
+
+    return None
+
+
+def _get_agent_md_files(cwd: Path) -> Path | None:
+    current = cwd.resolve()
+
+    if current.is_dir():
+        agent_md_file = current / AGENT_MD_FILE
+        if agent_md_file.is_file():
+            content = agent_md_file.read_text(encoding="utf-8")
+            return content
+
+    return None
+
+
+def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _merge_dicts(result[key], value)
+        else:
+            result[key] = value
+
+    return result
+
+
+def load_config(cwd: Path | None) -> Config:
+    cwd = cwd or Path.cwd()
+
+    system_path = get_system_config_path()
+
+    config_dict: dict[str, Any] = {}
+
+    if system_path.is_file():
+        try:
+            config_dict = _parse_toml(system_path)
+        except ConfigError:
+            logger.warning(f"跳过无效的系统配置: {system_path}")
+
+    project_path = _get_project_config(cwd)
+
+    if project_path:
+        try:
+            project_config_dict = _parse_toml(project_path)
+            config_dict = _merge_dicts(config_dict, project_config_dict)
+        except ConfigError:
+            logger.warning(f"跳过无效的系统配置: {system_path}")
+
+    if "cwd" not in config_dict:
+        config_dict["cwd"] = cwd
+
+    if "developer_instructions" not in config_dict:
+        agent_md_content = _get_agent_md_files(cwd)
+        if agent_md_content:
+            config_dict["developer_instructions"] = agent_md_content
+    try:
+        config = Config(**config)
+    except Exception as e:
+        raise ConfigError(f"错误: {e}") from e
+    return config
