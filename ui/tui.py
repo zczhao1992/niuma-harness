@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 from typing import Any, Tuple
+from config.config import Config
 from rich.console import Console
 from rich.theme import Theme
 from rich.rule import Rule
@@ -53,11 +54,12 @@ def get_console() -> Console:
 
 
 class TUI:
-    def __init__(self, console: Console | None = None) -> None:
+    def __init__(self,  config: Config, console: Console | None = None) -> None:
         self.console = console or get_console()
         self._assistant_stream_open = False
         self._tool_args_by_call_id: dict[str, dict[str, Any]] = {}
-        self.cwd = Path.cwd()
+        self.config = config
+        self.cwd = self.config.cwd
 
     def begin_assistant(self) -> None:
         self.console.print()

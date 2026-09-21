@@ -20,7 +20,7 @@ def get_tokeniuzer(model: str):
         return encoding.encode
 
 
-def count_tokens(text: str, model: str) -> int:
+def count_tokens(text: str, model: str = "deepseek-chat") -> int:
     """计算给定文本在指定模型下的准确 Token 数量。
 
     Args:

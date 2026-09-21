@@ -2,6 +2,7 @@ import asyncio
 import os
 from typing import Any, AsyncGenerator
 
+from config.config import Config
 from dotenv import load_dotenv
 from client.response import StreamEvent, TextDelta, TokenUsage, StreamEventType, ToolCall, ToolCallDelta, parse_tool_call_arguments
 from openai import APIConnectionError, APIError, AsyncOpenAI, RateLimitError
@@ -13,11 +14,13 @@ load_dotenv()
 class LLMClient:
     """LLM 客户端封装类，用于统一管理与 大模型 API 的异步通信。"""
 
-    def __init__(self) -> None:
+    def __init__(self, config: Config) -> None:
         """初始化客户端实例，默认底层 AsyncOpenAI 连接句柄为 None(延迟加载模式)。"""
         self._client: AsyncOpenAI | None = None
         """最大重试数"""
         self._max_retries: int = 3
+        """配置信息"""
+        self.config = config
 
     def get_client(self) -> None:
         """获取或初始化单例 AsyncOpenAI 客户端句柄。
@@ -26,10 +29,8 @@ class LLMClient:
         """
         if self._client is None:
             self._client = AsyncOpenAI(
-                api_key=os.getenv("DEEPSEEK_API_KEY"),
-                base_url=os.getenv(
-                    "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
-                )
+                api_key=self.config.api_key,
+                base_url=self.config.base_url
             )
 
         return self._client
@@ -78,7 +79,7 @@ class LLMClient:
 
         # 构建发送给 OpenAI API 的统一参数字典
         kwargs = {
-            "model": "deepseek-chat",
+            "model": self.config.model_name,
             "messages": messages,
             "stream": stream
         }

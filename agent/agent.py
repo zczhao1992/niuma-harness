@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 from agent.events import AgentEvent, AgentEventType
 from client.llm_client import LLMClient
 from client.response import StreamEventType, ToolCall, ToolResultMessage
+from config.config import Config
 from context.manager import ContextManager
 from tools.registry import create_default_registry
 
@@ -15,10 +16,11 @@ class Agent:
     负责管理与大模型的交互、智能体主循环 (Agentic Loop) 以及事件流的调度生成。
     """
 
-    def __init__(self):
+    def __init__(self, config: Config):
         """初始化 Agent 实例，延迟加载 LLM 客户端与上下文管理器。"""
-        self.client = LLMClient()
-        self.context_manager = ContextManager()
+        self.config = config
+        self.client = LLMClient(config=config)
+        self.context_manager = ContextManager(config=config)
         self.tool_registry = create_default_registry()
 
     async def run(self, message: str):
@@ -57,81 +59,91 @@ class Agent:
         Yields:
             AgentEvent: 转换后的上层业务事件。
         """
-        response_text = ""
+        max_turns = self.config.max_turns
 
-        tool_schemas = self.tool_registry.get_schemas()
+        for turn_num in range(max_turns):
 
-        tool_calls: list[ToolCall] = []
+            response_text = ""
 
-        # 开启流式响应，监听底层的 StreamEvent
-        async for event in self.client.chat_completion(
-                self.context_manager.get_messages(),
-                tools=tool_schemas if tool_schemas else None,
-        ):
+            tool_schemas = self.tool_registry.get_schemas()
 
-            # 接收到模型增量输出文本
-            if event.type == StreamEventType.TEXT_DELTA:
-                if event.text_delta:
-                    content = event.text_delta.content
-                    response_text += content
-                    yield AgentEvent.text_delta(content)
-            elif event.type == StreamEventType.TOOL_CALL_COMPLETE:
-                if event.tool_call:
-                    tool_calls.append(event.tool_call)
-                # 触发异常/错误响应
-            elif event.type == StreamEventType.ERROR:
-                yield AgentEvent.agent_error(event.error or "Unknown error occurred.")
-        # 轮次结束：将 LLM 生成的完整回复保存进上下文历史，维持多轮对话记忆
-        self.context_manager.add_assistant_message(
-            response_text or None,
-            [
-                {
-                    "id": tc.call_id,
-                    "type": "function",
-                    "function": {"name": tc.name, "arguments": str(tc.arguments)}
-                }
-                for tc in tool_calls
-            ]
-            if tool_calls
-            else None
-        )
+            tool_calls: list[ToolCall] = []
 
-        if response_text:
-            yield AgentEvent.text_complete(response_text)
+            # 开启流式响应，监听底层的 StreamEvent
+            async for event in self.client.chat_completion(
+                    self.context_manager.get_messages(),
+                    tools=tool_schemas if tool_schemas else None,
+            ):
 
-        tool_call_results: list[ToolResultMessage] = []
-        for tool_call in tool_calls:
-            yield AgentEvent.tool_call_start(
-                tool_call.call_id,
-                tool_call.name,
-                tool_call.arguments
+                # 接收到模型增量输出文本
+                if event.type == StreamEventType.TEXT_DELTA:
+                    if event.text_delta:
+                        content = event.text_delta.content
+                        response_text += content
+                        yield AgentEvent.text_delta(content)
+                elif event.type == StreamEventType.TOOL_CALL_COMPLETE:
+                    if event.tool_call:
+                        tool_calls.append(event.tool_call)
+                    # 触发异常/错误响应
+                elif event.type == StreamEventType.ERROR:
+                    yield AgentEvent.agent_error(event.error or "Unknown error occurred.")
+            # 轮次结束：将 LLM 生成的完整回复保存进上下文历史，维持多轮对话记忆
+            self.context_manager.add_assistant_message(
+                response_text or None,
+                [
+                    {
+                        "id": tc.call_id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": str(tc.arguments)
+                        }
+                    }
+                    for tc in tool_calls
+                ]
+                if tool_calls
+                else None
             )
 
-            result = await self.tool_registry.invoke(
-                tool_call.name,
-                tool_call.arguments,
-                Path.cwd()
-            )
+            if response_text:
+                yield AgentEvent.text_complete(response_text)
 
-            yield AgentEvent.tool_call_complete(
-                tool_call.call_id,
-                tool_call.name,
-                result
-            )
+            if not tool_calls:
+                return
 
-            tool_call_results.append(
-                ToolResultMessage(
-                    tool_call_id=tool_call.call_id,
-                    content=result.to_model_output(),
-                    is_error=not result.success
+            tool_call_results: list[ToolResultMessage] = []
+            for tool_call in tool_calls:
+                yield AgentEvent.tool_call_start(
+                    tool_call.call_id,
+                    tool_call.name,
+                    tool_call.arguments
                 )
-            )
 
-        for tool_result in tool_call_results:
-            self.context_manager.add_tool_result(
-                tool_result.tool_call_id,
-                tool_result.content
-            )
+                result = await self.tool_registry.invoke(
+                    tool_call.name,
+                    tool_call.arguments,
+                    self.config.cwd
+                )
+
+                yield AgentEvent.tool_call_complete(
+                    tool_call.call_id,
+                    tool_call.name,
+                    result
+                )
+
+                tool_call_results.append(
+                    ToolResultMessage(
+                        tool_call_id=tool_call.call_id,
+                        content=result.to_model_output(),
+                        is_error=not result.success
+                    )
+                )
+
+            for tool_result in tool_call_results:
+                self.context_manager.add_tool_result(
+                    tool_result.tool_call_id,
+                    tool_result.content
+                )
 
     async def __aenter__(self) -> Agent:
         """异步上下文管理器入口。

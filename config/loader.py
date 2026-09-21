@@ -96,7 +96,7 @@ def load_config(cwd: Path | None) -> Config:
         if agent_md_content:
             config_dict["developer_instructions"] = agent_md_content
     try:
-        config = Config(**config)
+        config = Config(**config_dict)
     except Exception as e:
         raise ConfigError(f"错误: {e}") from e
     return config

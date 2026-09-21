@@ -6,6 +6,7 @@ from agent.events import AgentEventType
 from client.llm_client import LLMClient
 import asyncio
 import click
+from config.config import Config
 from config.loader import load_config
 from ui.tui import TUI, get_console
 
@@ -13,12 +14,13 @@ console = get_console()
 
 
 class CLI:
-    def __init__(self):
+    def __init__(self, config: Config):
         self.agent: Agent | None = None
-        self.tui = TUI(console)
+        self.config = config
+        self.tui = TUI(config, console)
 
     async def run_single(self, message: str) -> str | None:
-        async with Agent() as agent:
+        async with Agent(self.config) as agent:
             self.agent = agent
             return await self._process_message(message)
 
@@ -26,12 +28,12 @@ class CLI:
         self.tui.print_welcome(
             "NiuMa-Harness",
             lines=[
-                f"模型名称: deepseek/chat",
-                f"工作目录: {Path.cwd()}",
+                f"模型名称: {self.config.model_name}",
+                f"工作目录: {self.config.cwd}",
                 "指令: /help /config /approval /model /exit"
             ]
         )
-        async with Agent() as agent:
+        async with Agent(self.config) as agent:
             self.agent = agent
 
             while True:
@@ -134,7 +136,7 @@ def main(prompt: str | None, cwd: Path | None):
 
         sys.exit(1)
 
-    cli = CLI()
+    cli = CLI(config)
 
     if prompt:
         result = asyncio.run(cli.run_single(prompt))

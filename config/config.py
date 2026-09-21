@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class ModelConfig(BaseModel):
     name: str = "deepseek-chat"
-    trmperature: float = Field(default=1, ge=0.0, le=2.0)
+    temperature: float = Field(default=1, ge=0.0, le=2.0)
     context_window: int | None = 256000
 
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
     cwd: Path = Field(default_factory=Path.cwd)
 
     max_turns: int = 100
-    max_tool_output_tokens: int = 50000
+    # max_tool_output_tokens: int = 50000
 
     developer_instructions: str | None = None
     user_instructions: str | None = None
@@ -39,11 +39,11 @@ class Config(BaseModel):
 
     @property
     def temperature(self) -> float:
-        return self.model.trmperature
+        return self.model.temperature
 
     @model_name.setter
     def trmperature(self, value: str) -> None:
-        self.model.trmperature = value
+        self.model.temperature = value
 
     def validate(self) -> list[str]:
         errors: list[str] = []

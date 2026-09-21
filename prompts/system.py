@@ -1,23 +1,23 @@
 from datetime import datetime
 import platform
-# from config.config import Config
-# from tools.base import Tool
+from config.config import Config
+from tools.base import Tool
 
 
 def get_system_prompt(
-    # config: Config,
+    config: Config,
     user_memory: str | None = None,
-    # tools: list[Tool] | None = None,
+    tools: list[Tool] | None = None,
 ) -> str:
     parts = []
 
     # 身份与角色定义
     parts.append(_get_identity_section())
     # 运行环境感知
-    # parts.append(_get_environment_section(config))
+    parts.append(_get_environment_section(config))
 
-    # if tools:
-    #     parts.append(_get_tool_guidelines_section(tools))
+    if tools:
+        parts.append(_get_tool_guidelines_section(tools))
 
     # AGENTS.md 指南规范
     parts.append(_get_agents_md_section())
@@ -25,13 +25,13 @@ def get_system_prompt(
     # 安全规范
     parts.append(_get_security_section())
 
-    # if config.developer_instructions:
-    #     parts.append(
-    #         _get_developer_instructions_section(config.developer_instructions)
-    #     )
+    if config.developer_instructions:
+        parts.append(
+            _get_developer_instructions_section(config.developer_instructions)
+        )
 
-    # if config.user_instructions:
-    #     parts.append(_get_user_instructions_section(config.user_instructions))
+    if config.user_instructions:
+        parts.append(_get_user_instructions_section(config.user_instructions))
 
     if user_memory:
         parts.append(_get_memory_section(user_memory))
@@ -57,7 +57,7 @@ def _get_identity_section() -> str:
         你正在与用户进行结对编程(Pair Programming),协助他们完成目标。你应当保持主动、严谨，并始终专注于交付高质量的代码结果。"""
 
 
-# def _get_environment_section(config: Config) -> str:
+def _get_environment_section(config: Config) -> str:
     """生成环境感知模块"""
     now = datetime.now()
     os_info = f"{platform.system()} {platform.release()}"
@@ -213,7 +213,7 @@ def _get_memory_section(memory: str) -> str:
             请使用这些信息来提供个性化响应并保持行为一致性。"""
 
 
-# def _get_tool_guidelines_section(tools: list[Tool]) -> str:
+def _get_tool_guidelines_section(tools: list[Tool]) -> str:
     """生成工具列表与指导说明"""
 
     regular_tools = [t for t in tools if not t.name.startswith("subagent_")]
