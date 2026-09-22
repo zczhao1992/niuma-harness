@@ -1,13 +1,10 @@
 from __future__ import annotations
-from pathlib import Path
 from typing import AsyncGenerator
 
 from agent.events import AgentEvent, AgentEventType
-from client.llm_client import LLMClient
+from agent.session import Session
 from client.response import StreamEventType, ToolCall, ToolResultMessage
 from config.config import Config
-from context.manager import ContextManager
-from tools.registry import create_default_registry
 
 
 class Agent:
@@ -19,9 +16,7 @@ class Agent:
     def __init__(self, config: Config):
         """初始化 Agent 实例，延迟加载 LLM 客户端与上下文管理器。"""
         self.config = config
-        self.client = LLMClient(config=config)
-        self.context_manager = ContextManager(config=config)
-        self.tool_registry = create_default_registry()
+        self.session: Session | None = Session(self.config)
 
     async def run(self, message: str):
         """运行 Agent 主逻辑入口，对外暴露标准的事件流接口。
@@ -36,7 +31,7 @@ class Agent:
         yield AgentEvent.agent_start(message)
 
         # 2. 将当前用户输入追加至上下文历史管理系统中
-        self.context_manager.add_user_message(message)
+        self.session.context_manager.add_user_message(message)
 
         final_response: str | None = None
         # 3. 委托给内部的 _agentic_loop 处理具体的 LLM 交互与事件转换
@@ -62,16 +57,16 @@ class Agent:
         max_turns = self.config.max_turns
 
         for turn_num in range(max_turns):
-
+            self.session.increment_turn()
             response_text = ""
 
-            tool_schemas = self.tool_registry.get_schemas()
+            tool_schemas = self.session.tool_registry.get_schemas()
 
             tool_calls: list[ToolCall] = []
 
             # 开启流式响应，监听底层的 StreamEvent
-            async for event in self.client.chat_completion(
-                    self.context_manager.get_messages(),
+            async for event in self.session.client.chat_completion(
+                    self.session.context_manager.get_messages(),
                     tools=tool_schemas if tool_schemas else None,
             ):
 
@@ -88,7 +83,7 @@ class Agent:
                 elif event.type == StreamEventType.ERROR:
                     yield AgentEvent.agent_error(event.error or "Unknown error occurred.")
             # 轮次结束：将 LLM 生成的完整回复保存进上下文历史，维持多轮对话记忆
-            self.context_manager.add_assistant_message(
+            self.session.context_manager.add_assistant_message(
                 response_text or None,
                 [
                     {
@@ -119,7 +114,7 @@ class Agent:
                     tool_call.arguments
                 )
 
-                result = await self.tool_registry.invoke(
+                result = await self.session.tool_registry.invoke(
                     tool_call.name,
                     tool_call.arguments,
                     self.config.cwd
@@ -140,7 +135,7 @@ class Agent:
                 )
 
             for tool_result in tool_call_results:
-                self.context_manager.add_tool_result(
+                self.session.context_manager.add_tool_result(
                     tool_result.tool_call_id,
                     tool_result.content
                 )
@@ -157,6 +152,6 @@ class Agent:
 
         在退出 `async with` 作用域时自动触发，确保底层的 HTTP 会话与连接句柄被安全释放。
         """
-        if self.client:
-            await self.client.close()
-            self.client = None
+        if self.session and self.session.client:
+            await self.session.client.close()
+            self.session = None

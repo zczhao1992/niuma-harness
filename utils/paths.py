@@ -24,6 +24,13 @@ def display_path_rel_to_cwd(path: str, cwd: Path | None) -> str:
     return str(p)
 
 
+def ensure_parent_directory(path: str | Path) -> Path:
+    path = Path(path)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def is_binary_file(path: str | Path) -> bool:
     try:
         with open(path, 'rb') as f:

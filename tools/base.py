@@ -24,6 +24,21 @@ class ToolKind(str, Enum):
 
 
 @dataclass
+class FileDiff:
+    path: Path
+    old_content: str
+    new_content: str
+
+    is_new_file: bool = False
+    is_deletion: bool = False
+
+    def create_diff(self):
+        import difflib
+
+        old_lines = self.old_content
+
+
+@dataclass
 class ToolResult:
     """工具执行结果对象。
 
@@ -39,6 +54,7 @@ class ToolResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     truncated: bool = False
+    diff: FileDiff | None = None
 
     @classmethod
     def error_result(cls, error: str, output: str = "", **kwargs: Any):
