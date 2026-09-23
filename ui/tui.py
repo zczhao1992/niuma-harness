@@ -60,6 +60,7 @@ class TUI:
         self._tool_args_by_call_id: dict[str, dict[str, Any]] = {}
         self.config = config
         self.cwd = self.config.cwd
+        self._max_block_tokens = 240
 
     def begin_assistant(self) -> None:
         self.console.print()
@@ -76,7 +77,8 @@ class TUI:
 
     def _ordered_args(self, tool_name: str, args: dict[str, Any]) -> list[Tuple]:
         _PREFERRED_ORDER = {
-            "read_file": ["path", "offset", "limit"]
+            "read_file": ["path", "offset", "limit"],
+            "write_file": ["path", "create_directories", "content"]
         }
 
         preferred = _PREFERRED_ORDER.get(tool_name, [])
@@ -99,6 +101,11 @@ class TUI:
         table.add_column(style="code", overflow="fold")
 
         for key, value in self._ordered_args(tool_name, args):
+            if isinstance(value, str):
+                if key in {"content", "old_string", "new_string"}:
+                    line_count = len(value.splitlines()) or 0
+                    byte_count = len(value.encode("utf-8", errors="replace"))
+                    value = f"<{line_count} 行 ● {byte_count} 字节>"
             table.add_row(key, value)
 
         return table
@@ -215,6 +222,7 @@ class TUI:
         output: str,
         error: str | None,
         metadata: dict[str, Any],
+        diff: str | None,
         truncated: bool
     ) -> None:
 
@@ -264,13 +272,23 @@ class TUI:
                     word_wrap=False
                 ))
             else:
-                output_display = truncate_text(output, "", 240)
+                output_display = truncate_text(
+                    output, "", self._max_block_tokens)
                 blocks.append(Syntax(
                     output_display,
                     "text",
                     theme="monokai",
                     word_wrap=False
                 ))
+        elif name == "write_file" and success and diff:
+            output_line = output.strip() if output.strip() else "完成"
+            blocks.append(Text(output_line, style="muted"))
+            diff_text = diff
+            diff_display = truncate_text(
+                diff_text, self.config.model_name, self._max_block_tokens)
+
+            blocks.append(Syntax(diff_display, "diff",
+                          theme="monokai", word_wrap=True))
 
         if truncated:
             blocks.append(

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from tools.base import Tool, ToolInvocation, ToolKind, ToolResult
+from tools.base import FileDiff, Tool, ToolInvocation, ToolKind, ToolResult
 from utils.paths import ensure_parent_directory, resolve_path
 
 
@@ -48,7 +48,19 @@ class WriteFileTool(Tool):
             line_count = len(params.content.splitlines())
 
             return ToolResult.success_result(
-                f"{action} {path} {line_count} 行"
+                f"{action} {path} {line_count} 行",
+                diff=FileDiff(
+                    path=path,
+                    old_content=old_content,
+                    new_content=params.content,
+                    is_new_file=is_new_file
+                ),
+                metadata={
+                    "path": str(path),
+                    "is_new_file": is_new_file,
+                    "lines": line_count,
+                    "bytes": len(params.content.encode("utf-8"))
+                }
             )
         except OSError as e:
             return ToolResult.error_result(f"写入文件错误: {e}")

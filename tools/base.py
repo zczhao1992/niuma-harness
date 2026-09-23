@@ -32,10 +32,29 @@ class FileDiff:
     is_new_file: bool = False
     is_deletion: bool = False
 
-    def create_diff(self):
+    def to_diff(self) -> str:
         import difflib
 
-        old_lines = self.old_content
+        old_lines = self.old_content.splitlines(keepends=True)
+        new_lines = self.new_content.splitlines(keepends=True)
+
+        if old_lines and not old_lines[-1].endswith("\n"):
+            old_lines[-1] += "\n"
+
+        if new_lines and not new_lines[-1].endswith("\n"):
+            new_lines[-1] += "\n"
+
+        old_name = "/dev/null" if self.is_new_file else str(self.path)
+        new_name = "/dev/null" if self.is_deletion else str(self.path)
+
+        diff = difflib.unified_diff(
+            old_lines,
+            new_lines,
+            fromfile=old_name,
+            tofile=new_name
+        )
+
+        return "".join(diff)
 
 
 @dataclass
