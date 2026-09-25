@@ -2,6 +2,7 @@ from __future__ import annotations
 import abc
 
 from pathlib import Path
+from config.config import Config
 from pydantic import BaseModel, ValidationError
 from enum import Enum
 from typing import Any
@@ -132,8 +133,8 @@ class Tool(abc.ABC):
     """工具的安全类别（默认只读）"""
     kind: ToolKind = ToolKind.READ
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, config: Config) -> None:
+        self.config = config
 
     @property
     def schema(self) -> dict[str, Any] | type["BaseModel"]:
