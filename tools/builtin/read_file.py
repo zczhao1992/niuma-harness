@@ -76,7 +76,7 @@ class ReadFileTool(Tool):
 
             # 空文件特殊处理
             if total_lines == 0:
-                return ToolResult.success("文件为空", metadata={"lines": 0})
+                return ToolResult.success_result("文件为空", metadata={"lines": 0})
 
             # 6. 计算分页切片范围 (1-based offset 转为 0-based 切片)
             start_idx = max(0, params.offset - 1)

@@ -229,9 +229,12 @@ class LLMClient:
         if message.tool_calls:
             for tc in message.tool_calls:
                 tool_calls.append(
-                    call_id=tc.id,
-                    name=tc.function.name,
-                    arguments=parse_tool_call_arguments(tc.function.arguments)
+                    ToolCall(
+                        call_id=tc.id,
+                        name=tc.function.name,
+                        arguments=parse_tool_call_arguments(
+                            tc.function.arguments),
+                    )
                 )
 
         # 提取非流式响应的 Token 使用量统计

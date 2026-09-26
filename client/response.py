@@ -20,7 +20,7 @@ class StreamEventType(str, Enum):
 
     TOOL_CALL_START = "tool_call_start"
     TOOL_CALL_DELTA = "tool_call_delta"
-    TOOL_CALL_COMPLETE = "too_call_complete"
+    TOOL_CALL_COMPLETE = "tool_call_complete"
 
 
 @dataclass

@@ -79,7 +79,9 @@ class TUI:
         _PREFERRED_ORDER = {
             "read_file": ["path", "offset", "limit"],
             "write_file": ["path", "create_directories", "content"],
-            "edit": ["path", "replace_all", "old_string", "new_string"]
+            "edit": ["path", "replace_all", "old_string", "new_string"],
+            "shell": ["command", "timeout", "cwd"],
+            "list_dir": ["path", "include_hidden"]
         }
 
         preferred = _PREFERRED_ORDER.get(tool_name, [])
@@ -107,6 +109,26 @@ class TUI:
                     line_count = len(value.splitlines()) or 0
                     byte_count = len(value.encode("utf-8", errors="replace"))
                     value = f"<{line_count} 行 ● {byte_count} 字节>"
+
+            if value is None:
+                return "null"
+
+            if isinstance(value, bool):
+                return "true" if value else "false"
+
+            if isinstance(value, (int, float)):
+                return str(value)
+
+            if isinstance(value, (list, tuple, set)):
+                return ", ".join(self._format_arg_value(key, v) for v in value)
+
+            if isinstance(value, dict):
+                import json
+                try:
+                    return json.dumps(value, ensure_ascii=False, indent=2)
+                except TypeError:
+                    return repr(value)
+
             table.add_row(key, value)
 
         return table
@@ -224,7 +246,8 @@ class TUI:
         error: str | None,
         metadata: dict[str, Any],
         diff: str | None,
-        truncated: bool
+        truncated: bool,
+        exit_code: int | None,
     ) -> None:
 
         border_style = f"tool.{tool_kind}" if tool_kind else "tool"
@@ -237,6 +260,8 @@ class TUI:
             ("  ", "muted"),
             (f"#{call_id[:8]}", "muted")
         )
+
+        args = self._tool_args_by_call_id.get(call_id, {})
 
         primary_path = None
         blocks = []
@@ -290,6 +315,45 @@ class TUI:
 
             blocks.append(Syntax(diff_display, "diff",
                           theme="monokai", word_wrap=True))
+        elif name == "shell":
+            command = args.get("command")
+            if isinstance(command, str) and command.strip():
+                blocks.append(Text(f"$ {command.strip()}", style="muted"))
+
+            if exit_code is not None:
+                blocks.append(Text(f"exit_code={exit_code}", style="muted"))
+
+            output_display = truncate_text(
+                output, self.config.model_name, self._max_block_tokens)
+
+            blocks.append(Syntax(output_display, "text",
+                          theme="monokai", word_wrap=True))
+        elif name == "list_dir":
+            entries = metadata.get("entries")
+            path = metadata.get("path")
+            summary = []
+            if isinstance(path, str):
+                summary.append(path)
+
+            if isinstance(entries, int):
+                summary.append(f"{entries} entries")
+
+            if summary:
+                blocks.append(Text(" • ".join(summary), style="muted"))
+
+            output_display = truncate_text(
+                output,
+                self.config.model_name,
+                self._max_block_tokens,
+            )
+            blocks.append(
+                Syntax(
+                    output_display,
+                    "text",
+                    theme="monokai",
+                    word_wrap=True,
+                )
+            )
 
         if truncated:
             blocks.append(
