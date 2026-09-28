@@ -95,7 +95,7 @@ class CLI:
             elif event.type == AgentEventType.TOOL_CALL_COMPLETE:
                 tool_name = event.data.get("name", "未知")
                 tool_kind = self._get_tool_kind(tool_name)
-                self.tui.tool_call_comlete(
+                self.tui.tool_call_complete(
                     event.data.get("call_id", ""),
                     tool_name,
                     tool_kind,

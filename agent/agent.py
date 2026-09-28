@@ -5,6 +5,7 @@ from agent.events import AgentEvent, AgentEventType
 from agent.session import Session
 from client.response import StreamEventType, ToolCall, ToolResultMessage
 from config.config import Config
+import json
 
 
 class Agent:
@@ -91,7 +92,7 @@ class Agent:
                         "type": "function",
                         "function": {
                             "name": tc.name,
-                            "arguments": str(tc.arguments)
+                            "arguments": json.dumps(tc.arguments, ensure_ascii=False)
                         }
                     }
                     for tc in tool_calls

@@ -32,14 +32,14 @@ class ContextManager:
     def __init__(self, config: Config) -> None:
         self._system_prompt = get_system_prompt(config)
         self.config = config
-        self._modle_name = self.config.model_name
+        self._model_name = self.config.model_name
         self._messages: list[MessageItem] = []
 
     def add_user_message(self, content: str) -> None:
         item = MessageItem(
             role='user',
             content=content,
-            token_count=count_tokens(content, self._modle_name)
+            token_count=count_tokens(content, self._model_name)
         )
 
         self._messages.append(item)
@@ -49,7 +49,7 @@ class ContextManager:
             role="tool",
             content=content,
             tool_call_id=tool_call_id,
-            token_count=count_tokens(content, self._modle_name)
+            token_count=count_tokens(content, self._model_name)
         )
 
         self._messages.append(item)
@@ -58,7 +58,7 @@ class ContextManager:
         item = MessageItem(
             role='assistant',
             content=content or "",
-            token_count=count_tokens(content or "", self._modle_name),
+            token_count=count_tokens(content or "", self._model_name),
             tool_calls=tool_calls or []
         )
 

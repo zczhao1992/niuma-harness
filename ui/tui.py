@@ -60,7 +60,7 @@ class TUI:
         self._tool_args_by_call_id: dict[str, dict[str, Any]] = {}
         self.config = config
         self.cwd = self.config.cwd
-        self._max_block_tokens = 240
+        self._max_block_tokens = 2500
 
     def begin_assistant(self) -> None:
         self.console.print()
@@ -82,7 +82,8 @@ class TUI:
             "edit": ["path", "replace_all", "old_string", "new_string"],
             "shell": ["command", "timeout", "cwd"],
             "list_dir": ["path", "include_hidden"],
-            "grep": ["path", "case_insensitive", "pattern"]
+            "grep": ["path", "case_insensitive", "pattern"],
+            "glob": ["path", "pattern"]
         }
 
         preferred = _PREFERRED_ORDER.get(tool_name, [])
@@ -112,23 +113,20 @@ class TUI:
                     value = f"<{line_count} 行 ● {byte_count} 字节>"
 
             if value is None:
-                return "null"
+                value = "null"
 
             if isinstance(value, bool):
-                return "true" if value else "false"
+                value = "true" if value else "false"
 
             if isinstance(value, (int, float)):
-                return str(value)
-
-            if isinstance(value, (list, tuple, set)):
-                return ", ".join(self._format_arg_value(key, v) for v in value)
+                value = str(value)
 
             if isinstance(value, dict):
                 import json
                 try:
-                    return json.dumps(value, ensure_ascii=False, indent=2)
+                    value = json.dumps(value, ensure_ascii=False, indent=2)
                 except TypeError:
-                    return repr(value)
+                    value = repr(value)
 
             table.add_row(key, value)
 
@@ -238,7 +236,7 @@ class TUI:
             )
         )
 
-    def tool_call_comlete(
+    def tool_call_complete(
         self, call_id: str,
         name: str,
         tool_kind: str | None,
@@ -369,6 +367,49 @@ class TUI:
 
             output_display = truncate_text(
                 output, self.config.model_name, self._max_block_tokens
+            )
+            blocks.append(
+                Syntax(
+                    output_display,
+                    "text",
+                    theme="monokai",
+                    word_wrap=True,
+                )
+            )
+        elif name == "glob" and success:
+            matches = metadata.get("matches")
+            if isinstance(matches, int):
+                blocks.append(Text(f"{matches} 匹配", style="muted"))
+
+            output_display = truncate_text(
+                output,
+                self.config.model_name,
+                self._max_block_tokens,
+            )
+            blocks.append(
+                Syntax(
+                    output_display,
+                    "text",
+                    theme="monokai",
+                    word_wrap=True,
+                )
+            )
+        elif name == "web_search" and success:
+            results = metadata.get("results")
+            query = args.get("query")
+            summary = []
+            if isinstance(query, str):
+                summary.append(query)
+            if isinstance(results, int):
+                summary.append(f"{results} results")
+
+            if summary:
+                blocks.append(Text(" • ".join(summary), style="muted"))
+
+            output_display = truncate_text(
+                output,
+                self.config.model_name,
+                self._max_block_tokens,
             )
             blocks.append(
                 Syntax(
