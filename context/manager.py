@@ -24,7 +24,14 @@ class MessageItem:
             result["tool_calls"] = self.tool_calls
 
         if self.content:
-            result['content'] = self.content
+            result["content"] = self.content
+        elif self.role == "tool":
+
+            result["content"] = ""
+        elif self.tool_calls:
+
+            result["content"] = None
+
         return result
 
 
