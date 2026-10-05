@@ -229,7 +229,7 @@ def _get_tool_guidelines_section(tools: list[Tool]) -> str:
         description = tool.description
         if len(description) > 100:
             description = description[:100] + "..."
-        guidelines += f"- **{tool.name}**：{description}\n"
+        guidelines += f"- **{tool.name}**: {description}\n"
 
     if subagent_tools:
         guidelines += "\n## 子 Agent 工具\n\n"
@@ -237,7 +237,7 @@ def _get_tool_guidelines_section(tools: list[Tool]) -> str:
             description = tool.description
             if len(description) > 100:
                 description = description[:100] + "..."
-            guidelines += f"- **{tool.name}**：{description}\n"
+            guidelines += f"- **{tool.name}**: {description}\n"
 
     guidelines += """
         ## 最佳实践

@@ -3,7 +3,7 @@ from pathlib import Path
 import tomli
 from typing import Any
 from config.config import Config
-from platformdirs import user_config_dir
+from platformdirs import user_config_dir, user_data_dir
 from utils.errors import ConfigError
 import logging
 
@@ -15,6 +15,10 @@ AGENT_MD_FILE = "AGENT.MD"
 
 def get_config_dir() -> Path:
     return Path(user_config_dir("niuma-harness"))
+
+
+def get_data_dir() -> Path:
+    return Path(user_data_dir("niuma-harness"))
 
 
 def get_system_config_path() -> Path:
