@@ -12,9 +12,13 @@ class Session:
     def __init__(self, config: Config):
         self.config = config
         self.client = LLMClient(config=config)
-        self.context_manager = ContextManager(
-            config=config, user_memory=self._load_memory())
         self.tool_registry = create_default_registry(config)
+        self.context_manager = ContextManager(
+            config=config,
+            user_memory=self._load_memory(),
+            tools=self.tool_registry.get_tools()
+        )
+
         self.session_id = str(uuid.uuid4())
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
@@ -36,7 +40,7 @@ class Session:
             if not entries:
                 return None
 
-            lines = ["User preferences and notes:"]
+            lines = ["用户偏好与备注:"]
             for key, value in entries.items():
                 lines.append(f"- {key}: {value}")
 

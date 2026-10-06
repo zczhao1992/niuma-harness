@@ -25,6 +25,11 @@ class Config(BaseModel):
     max_turns: int = 100
     # max_tool_output_tokens: int = 50000
 
+    allowed_tools: list[str] | None = Field(
+        None,
+        description="如果已设置，则代理只能使用这些工具",
+    )
+
     developer_instructions: str | None = None
     user_instructions: str | None = None
 

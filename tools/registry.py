@@ -17,9 +17,10 @@ class ToolRegistry:
     作为 LLM 与具象工具 (Tools) 之间的中介层 (Mediator)。
     """
 
-    def __init__(self):
+    def __init__(self, config: Config):
         """初始化工具注册中心，建立底层工具映射表。"""
         self._tools: dict[str, Tool] = {}
+        self.config = config
 
     def register(self, tool: Tool) -> None:
         """注册一个新的工具到注册中心。
@@ -73,6 +74,10 @@ class ToolRegistry:
 
         for tool in self._tools.values():
             tools.append(tool)
+
+        if self.config.allowed_tools:
+            allowed_set = set(self.config.allowed_tools)
+            tools = [t for t in tools if t.name in allowed_set]
 
         return tools
 
@@ -132,7 +137,7 @@ class ToolRegistry:
 
 
 def create_default_registry(config: Config) -> ToolRegistry:
-    registry = ToolRegistry()
+    registry = ToolRegistry(config)
 
     for tool_class in get_all_builtin_tools():
         registry.register(tool_class(config))
