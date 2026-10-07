@@ -5,6 +5,7 @@ from tools.base import Tool, ToolInvocation, ToolResult
 import logging
 
 from tools.builtin import ReadFileTool, get_all_builtin_tools
+from tools.subagents import SubagentTool, get_default_subagent_definitions
 # from tools.builtin.write_file import WriteFileTool
 
 logger = logging.getLogger(__name__)
@@ -141,5 +142,8 @@ def create_default_registry(config: Config) -> ToolRegistry:
 
     for tool_class in get_all_builtin_tools():
         registry.register(tool_class(config))
+
+    for subagent_def in get_default_subagent_definitions():
+        registry.register(SubagentTool(config, subagent_def))
 
     return registry

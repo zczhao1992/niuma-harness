@@ -141,6 +141,8 @@ class Agent:
                     tool_result.content
                 )
 
+        yield AgentEvent.agent_error(f"已达到最大循环次数({max_turns})")
+
     async def __aenter__(self) -> Agent:
         """异步上下文管理器入口。
 
