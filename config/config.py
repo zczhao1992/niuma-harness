@@ -1,7 +1,8 @@
+from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ModelConfig(BaseModel):
@@ -17,6 +18,31 @@ class ShellEnvironmentPolicy(BaseModel):
     set_vars: dict[str, str] = Field(default_factory=dict)
 
 
+class MCPServerConfig(BaseModel):
+    enabled: bool = True
+    startup_timeout_sec: float = 10
+
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    cwd: Path | None = None
+
+    url: str | None = None
+
+    @model_validator(mode="after")
+    def validate_transport(self) -> MCPServerConfig:
+        has_command = self.command is not None
+        has_url = self.url is not None
+
+        if not has_command and not has_url:
+            raise ValueError(
+                "MCP服务器必须具备 '命令' (stdio) 或 'URL' (http/sse) 功能")
+
+        if has_command and has_url:
+            raise ValueError(
+                "MCP服务器不能同时具有 '命令' (stdio) 和 'URL' (http/sse)")
+
+
 class Config(BaseModel):
     model: ModelConfig = Field(default_factory=ModelConfig)
     cwd: Path = Field(default_factory=Path.cwd)
@@ -25,6 +51,8 @@ class Config(BaseModel):
 
     max_turns: int = 100
     # max_tool_output_tokens: int = 50000
+    mcp_servers: dict[str, MCPServerConfig] = Field(
+        default_factory=dict)
 
     allowed_tools: list[str] | None = Field(
         None,
