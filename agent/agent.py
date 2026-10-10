@@ -148,6 +148,7 @@ class Agent:
 
         支持使用 `async with Agent() as agent:` 方式安全调用。
         """
+        await self.session.initialize()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

@@ -21,6 +21,7 @@ class ToolRegistry:
     def __init__(self, config: Config):
         """初始化工具注册中心，建立底层工具映射表。"""
         self._tools: dict[str, Tool] = {}
+        self._mcp_tools: dict[str, Tool] = {}
         self.config = config
 
     def register(self, tool: Tool) -> None:
@@ -36,6 +37,10 @@ class ToolRegistry:
 
         self._tools[tool.name] = tool
         logger.debug(f"注册工具: {tool.name}")
+
+    def register_mcp_tool(self, tool: Tool) -> None:
+        self._mcp_tools[tool.name] = tool
+        logger.debug(f"注册 MCP 工具: {tool.name}")
 
     def unregister(self, name: str) -> bool:
         """根据工具名称注销/移除已注册的工具。
@@ -63,6 +68,9 @@ class ToolRegistry:
         """
         if name in self._tools:
             return self._tools[name]
+        elif name in self._mcp_tools:
+            return self._mcp_tools[name]
+
         return None
 
     def get_tools(self) -> list[Tool]:
@@ -75,6 +83,9 @@ class ToolRegistry:
 
         for tool in self._tools.values():
             tools.append(tool)
+
+        for mcp_tool in self._mcp_tools.values():
+            tools.append(mcp_tool)
 
         if self.config.allowed_tools:
             allowed_set = set(self.config.allowed_tools)

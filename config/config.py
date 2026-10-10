@@ -42,6 +42,8 @@ class MCPServerConfig(BaseModel):
             raise ValueError(
                 "MCP服务器不能同时具有 '命令' (stdio) 和 'URL' (http/sse)")
 
+        return self
+
 
 class Config(BaseModel):
     model: ModelConfig = Field(default_factory=ModelConfig)
