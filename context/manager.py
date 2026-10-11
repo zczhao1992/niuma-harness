@@ -1,4 +1,5 @@
 from typing import Any
+from client.response import TokenUsage
 from config.config import Config
 from prompts.system import get_system_prompt
 from dataclasses import dataclass, field
@@ -42,6 +43,8 @@ class ContextManager:
         self.config = config
         self._model_name = self.config.model_name
         self._messages: list[MessageItem] = []
+        self._latest_usage = TokenUsage()
+        self.total_usage = TokenUsage()
 
     def add_user_message(self, content: str) -> None:
         item = MessageItem(
@@ -85,3 +88,9 @@ class ContextManager:
             messages.append(item.to_dict())
 
         return messages
+
+    def set_latest_usage(self, usage: TokenUsage):
+        self._latest_usage = usage
+
+    def add_usage(self, usage: TokenUsage):
+        self.total_usage += usage

@@ -1,10 +1,13 @@
 [model]
-name="deepseek-chat"
+name = "deepseek-chat"
 
 [mcp_servers.filesystem]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-filesystem", "C:/Users/Acer/Desktop/niuma-harness", "/tmp"]
-
-[mcp_servers.filesystem2]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-filesystem222222222222", "C:/Users/Acer/Desktop/niuma-harness", "/tmp"]
+enabled = true
+command = "cmd"
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "E:/Demo/niuma-harness"
+]

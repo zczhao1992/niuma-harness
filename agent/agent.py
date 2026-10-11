@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 
 from agent.events import AgentEvent, AgentEventType
 from agent.session import Session
-from client.response import StreamEventType, ToolCall, ToolResultMessage
+from client.response import StreamEventType, TokenUsage, ToolCall, ToolResultMessage
 from config.config import Config
 import json
 
@@ -61,9 +61,21 @@ class Agent:
             self.session.increment_turn()
             response_text = ""
 
+            # 检查上下文溢出
+            if self.session.context_manager.needs_compression():
+                summary, usage = await self.session.chat_compactor.compress(
+                    self.session.context_manager
+                )
+
+                if summary:
+                    self.session.context_manager.replace_with_summary(summary)
+                    self.session.context_manager.set_latest_usage(usage)
+                    self.session.context_manager.add_usage(usage)
+
             tool_schemas = self.session.tool_registry.get_schemas()
 
             tool_calls: list[ToolCall] = []
+            usage: TokenUsage | None = None
 
             # 开启流式响应，监听底层的 StreamEvent
             async for event in self.session.client.chat_completion(
@@ -83,6 +95,9 @@ class Agent:
                     # 触发异常/错误响应
                 elif event.type == StreamEventType.ERROR:
                     yield AgentEvent.agent_error(event.error or "Unknown error occurred.")
+                elif event.type == StreamEventType.MESSAGE_COMPLETE:
+                    usage = event.usage
+
             # 轮次结束：将 LLM 生成的完整回复保存进上下文历史，维持多轮对话记忆
             self.session.context_manager.add_assistant_message(
                 response_text or None,
@@ -105,6 +120,11 @@ class Agent:
                 yield AgentEvent.text_complete(response_text)
 
             if not tool_calls:
+                if usage:
+                    self.session.context_manager.set_latest_usage(usage)
+                    self.session.context_manager.add_usage(usage)
+
+                self.session.context_manager.prune_tool_outputs()
                 return
 
             tool_call_results: list[ToolResultMessage] = []
@@ -156,6 +176,7 @@ class Agent:
 
         在退出 `async with` 作用域时自动触发，确保底层的 HTTP 会话与连接句柄被安全释放。
         """
-        if self.session and self.session.client:
+        if self.session and self.session.client and self.session.mcp_manager:
             await self.session.client.close()
+            await self.session.mcp_manager.shutdown()
             self.session = None
