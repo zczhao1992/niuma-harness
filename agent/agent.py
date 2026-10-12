@@ -161,6 +161,12 @@ class Agent:
                     tool_result.content
                 )
 
+            if usage:
+                self.session.context_manager.set_latest_usage(usage)
+                self.session.context_manager.add_usage(usage)
+
+            self.session.context_manager.prune_tool_outputs()
+
         yield AgentEvent.agent_error(f"已达到最大循环次数({max_turns})")
 
     async def __aenter__(self) -> Agent:
