@@ -16,6 +16,7 @@ class MessageItem:
     tool_call_id: str | None = None
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     token_count: int | None = None
+    pruned_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {"role": self.role}
