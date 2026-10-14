@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any
 from config.config import Config
+from hooks.hook_system import HookSystem
+from safety.approval import ApprovalContext, ApprovalDecision, ApprovalManager
 from tools.base import Tool, ToolInvocation, ToolResult
 import logging
 
@@ -103,7 +105,13 @@ class ToolRegistry:
         """
         return [tool.to_openai_schema() for tool in self.get_tools()]
 
-    async def invoke(self, name: str, params: dict[str, Any], cwd: Path) -> ToolResult:
+    async def invoke(self,
+                     name: str,
+                     params: dict[str, Any],
+                     cwd: Path,
+                     hook_system: HookSystem,
+                     approval_manager: ApprovalManager | None = None
+                     ) -> ToolResult:
         """统一调度并异步执行指定的工具。
 
         包含工具存在性检查、输入参数 Schema 预校验、上下文构造以及异常结果包装。
@@ -119,23 +127,60 @@ class ToolRegistry:
         # 1. 检索工具是否存在
         tool = self.get(name)
         if tool is None:
-            return ToolResult.error_result(f"错误工具: {name}", metadata={"tool_name": name})
+            result = ToolResult.error_result(
+                f"错误工具: {name}", metadata={"tool_name": name})
+            await hook_system.trigger_after_tool(name, params, result)
+            return result
 
         # 2. 参数 Schema 预校验
         validation_errors = tool.validate_params(params)
         if validation_errors:
-            return ToolResult.error_result(
+            result = ToolResult.error_result(
                 f"参数错误: {'; '.join(validation_errors)}",
                 metadata={
                     "tool_name": name,
                     "validation_errors": validation_errors
                 }
             )
+
+            await hook_system.trigger_after_tool(name, params, result)
+
+            return result
+
+        await hook_system.trigger_before_tool(name, params)
         # 3. 构造调用上下文 (Invocation Context)
         invocation = ToolInvocation(
             params=params,
             cwd=cwd
         )
+        if approval_manager:
+            confirmation = await tool.get_confirmation(invocation)
+            if confirmation:
+                context = ApprovalContext(
+                    tool_name=name,
+                    params=params,
+                    is_mutating=tool.is_mutating(params),
+                    affected_paths=confirmation.affected_paths,
+                    command=confirmation.command,
+                    is_dangerous=confirmation.is_dangerous,
+                )
+                decision = await approval_manager.check_approval(context)
+                if decision == ApprovalDecision.REJECTED:
+                    result = ToolResult.error_result(
+                        "被安全策略阻止的操作"
+                    )
+                    await hook_system.trigger_after_tool(name, params, result)
+                    return result
+                elif decision == ApprovalDecision.NEEDS_CONFIRMATION:
+                    approved = approval_manager.request_confirmation(
+                        confirmation)
+
+                    if not approved:
+                        result = ToolResult.error_result(
+                            "用户拒绝了该操作")
+                        await hook_system.trigger_after_tool(name, params, result)
+                        return result
+
         try:
             # 4. 执行工具逻辑
             result = await tool.execute(invocation)
@@ -145,6 +190,7 @@ class ToolRegistry:
             result = ToolResult.error_result(
                 f"错误: {str(e)}", metadata={"tool_name", name})
 
+        await hook_system.trigger_after_tool(name, params, result)
         return result
 
 

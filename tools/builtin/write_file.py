@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from tools.base import FileDiff, Tool, ToolInvocation, ToolKind, ToolResult
+from tools.base import FileDiff, Tool, ToolConfirmation, ToolInvocation, ToolKind, ToolResult
 from utils.paths import ensure_parent_directory, resolve_path
 
 
@@ -21,6 +21,39 @@ class WriteFileTool(Tool):
 
     kind = ToolKind.WRITE
     schema = WriteFileParams
+
+    async def get_confirmation(
+        self, invocation: ToolInvocation
+    ) -> ToolConfirmation | None:
+        params = WriteFileParams(**invocation.params)
+        path = resolve_path(invocation.cwd, params.path)
+
+        is_new_file = not path.exists()
+
+        old_content = ""
+        if not is_new_file:
+            try:
+                old_content = path.read_text(encoding="utf-8")
+            except:
+                pass
+
+        diff = FileDiff(
+            path=path,
+            old_content=old_content,
+            new_content=params.content,
+            is_new_file=is_new_file,
+        )
+
+        action = "Created" if is_new_file else "Updated"
+
+        return ToolConfirmation(
+            tool_name=self.name,
+            params=invocation.params,
+            description=f"{action} 文件: {path}",
+            diff=diff,
+            affected_paths=[path],
+            is_dangerous=not is_new_file,
+        )
 
     async def execute(self, invocation: ToolInvocation) -> ToolResult:
         params = WriteFileParams(**invocation.params)

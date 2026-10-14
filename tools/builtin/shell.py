@@ -43,6 +43,29 @@ class ShellTool(Tool):
 
     schema = ShellParams
 
+    async def get_confirmation(
+        self, invocation: ToolInvocation
+    ) -> ToolConfirmation | None:
+        params = ShellParams(**invocation.params)
+
+        for blocked in BLOCKED_COMMANDS:
+            if blocked in params.command:
+                return ToolConfirmation(
+                    tool_name=self.name,
+                    params=invocation.params,
+                    description=f"执行 (阻塞): {params.command}",
+                    command=params.command,
+                    is_dangerous=True,
+                )
+
+        return ToolConfirmation(
+            tool_name=self.name,
+            params=invocation.params,
+            description=f"执行: {params.command}",
+            command=params.command,
+            is_dangerous=False,
+        )
+
     async def execute(self, invocation: ToolInvocation) -> ToolResult:
         params = ShellParams(**invocation.params)
 

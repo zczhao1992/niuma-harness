@@ -1,11 +1,13 @@
 from __future__ import annotations
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Callable
 
 from agent.events import AgentEvent, AgentEventType
 from agent.session import Session
 from client.response import StreamEventType, TokenUsage, ToolCall, ToolResultMessage
 from config.config import Config
 import json
+
+from tools.base import ToolConfirmation
 
 
 class Agent:
@@ -14,10 +16,11 @@ class Agent:
     负责管理与大模型的交互、智能体主循环 (Agentic Loop) 以及事件流的调度生成。
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, confirmation_callback: Callable[[ToolConfirmation], bool] | None = None,):
         """初始化 Agent 实例，延迟加载 LLM 客户端与上下文管理器。"""
         self.config = config
         self.session: Session | None = Session(self.config)
+        self.session.approval_manager.confirmation_callback = confirmation_callback
 
     async def run(self, message: str):
         """运行 Agent 主逻辑入口，对外暴露标准的事件流接口。
@@ -28,6 +31,8 @@ class Agent:
          Yields:
              AgentEvent: 智能体生命周期事件流（如 AGENT_START、TEXT_DELTA、TEXT_COMPLETE、AGENT_END 等）。
          """
+        await self.session.hook_system.trigger_before_agent(message)
+
         # 1. 产出智能体启动事件，通知上层UI/终端任务开始
         yield AgentEvent.agent_start(message)
 
@@ -35,12 +40,15 @@ class Agent:
         self.session.context_manager.add_user_message(message)
 
         final_response: str | None = None
+
         # 3. 委托给内部的 _agentic_loop 处理具体的 LLM 交互与事件转换
         async for event in self._agentic_loop():
             yield event
             # 捕获单轮完整回复事件，提取最终文本内容
             if event.type == AgentEventType.TEXT_COMPLETE:
                 final_response = event.data.get("content")
+
+        await self.session.hook_system.trigger_after_agent(message, final_response)
         # 4. 产出智能体终结事件，带上最终回复结果
         yield AgentEvent.agent_end(final_response)
 
@@ -138,7 +146,9 @@ class Agent:
                 result = await self.session.tool_registry.invoke(
                     tool_call.name,
                     tool_call.arguments,
-                    self.config.cwd
+                    self.config.cwd,
+                    self.session.hook_system,
+                    self.session.approval_manager
                 )
 
                 yield AgentEvent.tool_call_complete(

@@ -33,7 +33,7 @@ class CLI:
                 "指令: /help /config /approval /model /exit"
             ]
         )
-        async with Agent(self.config) as agent:
+        async with Agent(self.config, confirmation_callback=self.tui.handle_confirmation) as agent:
             self.agent = agent
 
             while True:

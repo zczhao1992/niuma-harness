@@ -1,5 +1,5 @@
 from pathlib import Path
-from tools.base import FileDiff, Tool, ToolInvocation, ToolKind, ToolResult
+from tools.base import FileDiff, Tool, ToolConfirmation, ToolInvocation, ToolKind, ToolResult
 from pydantic import BaseModel, Field
 from utils.paths import ensure_parent_directory, resolve_path
 
@@ -32,6 +32,54 @@ class EditTool(Tool):
     )
     kind = ToolKind.WRITE
     schema = EditParams
+
+    async def get_confirmation(
+        self,
+        invocation: ToolInvocation,
+    ) -> ToolConfirmation | None:
+        params = EditParams(**invocation.params)
+        path = resolve_path(invocation.cwd, params.path)
+
+        is_new_file = not path.exists()
+
+        if is_new_file:
+            diff = FileDiff(
+                path=path,
+                old_content="",
+                new_content=params.new_string,
+                is_new_file=True,
+            )
+
+            return ToolConfirmation(
+                tool_name=self.name,
+                params=invocation.params,
+                description=f"创建新文件: {path}",
+                diff=diff,
+                affected_paths=[path],
+            )
+
+        old_content = path.read_text(encoding="utf-8")
+
+        if params.replace_all:
+            new_content = old_content.replace(
+                params.old_string, params.new_string)
+        else:
+            new_content = old_content.replace(
+                params.old_string, params.new_string, 1)
+
+        diff = FileDiff(
+            path=path,
+            old_content=old_content,
+            new_content=new_content,
+        )
+
+        return ToolConfirmation(
+            tool_name=self.name,
+            params=invocation.params,
+            description=f"编辑文件: {path}",
+            diff=diff,
+            affected_paths=[path],
+        )
 
     async def execute(self, invocation: ToolInvocation) -> ToolResult:
         params = EditParams(**invocation.params)

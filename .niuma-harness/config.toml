@@ -1,5 +1,19 @@
+hooks_enabled = true
+
 [model]
 name = "deepseek-chat"
+temperature = 0
+
+[[hooks]]
+name='test_before_tool'
+trigger='before_tool'
+command='python ./scripts/test_tool.py'
+
+[[hooks]]
+name='test_before_agent'
+trigger='before_agent'
+command='python ./scripts/test_tool.py'
+
 
 [mcp_servers.filesystem]
 enabled = true
