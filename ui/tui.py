@@ -274,7 +274,13 @@ class TUI:
 
         if name == "read_file" and success:
             if primary_path:
-                start_line, code = self._extract_read_file_code(output)
+                extracted = self._extract_read_file_code(
+                    output) if output else None
+                if extracted:
+                    start_line, code = extracted
+                else:
+                    start_line, code = 1, str(output or "")
+                # start_line, code = self._extract_read_file_code(output)
 
                 shown_start = metadata.get("shown_start")
                 shown_end = metadata.get("shown_end")

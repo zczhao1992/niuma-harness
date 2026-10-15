@@ -265,8 +265,9 @@ class CLI:
         elif cmd_name == "/restore":
             if not cmd_args:
                 console.print(
-                    f"[error]用法: /restire <checkpoint_id> [/error]")
+                    f"[error]用法: /restore <checkpoint_id> [/error]")
             else:
+                checkpoint_id = cmd_args
                 persistence_manager = PersistenceManager()
                 snapshot = persistence_manager.load_checkpoint(cmd_args)
                 if not snapshot:

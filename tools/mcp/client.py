@@ -70,8 +70,8 @@ class MCPClient:
                     name=tool.name,
                     description=tool.description or "",
                     input_schema=(
-                        tool.inputSchema if hasattr(
-                            tool, "inputSchema") else {}
+                        tool.input_schema if hasattr(
+                            tool, "input_schema") else {}
                     ),
                     server_name=self.name,
                 )
