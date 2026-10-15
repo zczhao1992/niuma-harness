@@ -51,6 +51,10 @@ class ContextManager:
         self._latest_usage = TokenUsage()
         self.total_usage = TokenUsage()
 
+    @property
+    def message_count(self) -> int:
+        return len(self._messages)
+
     def add_user_message(self, content: str) -> None:
         item = MessageItem(
             role='user',

@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.syntax import Syntax
 from rich.prompt import Prompt
+from rich.markdown import Markdown
 from tools.base import ToolConfirmation
 from utils.paths import display_path_rel_to_cwd, resolve_path
 from rich import box
@@ -565,3 +566,32 @@ class TUI:
         )
 
         return response.lower() in {"y", "yes"}
+
+    def show_help(self) -> None:
+        help_text = """
+                ## 命令
+
+                - `/help` - 显示此帮助信息
+                - `/exit` 或 `/quit` - 退出代理程序
+                - `/clear` - 清除对话历史记录
+                - `/config` - 显示当前配置信息
+                - `/model <name>` - 更改模型
+                - `/approval <mode>` - 更改审批模式
+                - `/stats` - 显示会话统计信息
+                - `/tools` - 列出可用工具
+                - `/mcp` - 显示MCP服务器状态
+                - `/save` - 保存当前会话
+                - `/checkpoint [name]` - 创建检查点
+                -  `/checkpoints` - 列出可用检查点
+                - `/restore <checkpoint_id>` - 恢复检查点
+                - `/sessions` - 列出已保存会话
+                - `/resume <session_id>` - 恢复已保存会话
+
+                ## 提示
+
+                - 只需输入您的消息即可与客服聊天 
+                - 客服可以阅读、编写和执行代码 
+                - 某些操作需要审批（可配置）
+            """
+
+        self.console.print(Markdown(help_text))

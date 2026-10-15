@@ -26,6 +26,10 @@ class ToolRegistry:
         self._mcp_tools: dict[str, Tool] = {}
         self.config = config
 
+    @property
+    def connected_mcp_servers(self) -> list[Tool]:
+        return self._mcp_tools.values()
+
     def register(self, tool: Tool) -> None:
         """注册一个新的工具到注册中心。
 
