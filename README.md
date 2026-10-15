@@ -29,7 +29,7 @@
 需要 Python 3.10+。
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/zczhao1992/niuma-harness.git
 cd niuma-harness
 python -m venv .venv
 # Windows
